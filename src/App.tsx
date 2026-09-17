@@ -599,8 +599,8 @@ export function App() {
               <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '8px' }}>
                 Skift mål for donationer pr. gang:
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {[150, 200, 250, 300, 350, 400].map((val) => (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[200, 250, 300, 350, 400, 450, 500].map((val) => (
                   <button
                     key={val}
                     onClick={() => setTargetAmount(val)}

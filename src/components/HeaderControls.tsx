@@ -100,7 +100,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
             }}
           >
-            {[150, 200, 250, 300, 350, 400].map((val) => (
+            {[200, 250, 300, 350, 400, 450, 500].map((val) => (
               <option key={val} value={val}>
                 {val} kr.
               </option>
