@@ -31,9 +31,12 @@ export function App() {
     presetKey: 'all',
   });
 
-  // Try auto-unlocking from session storage if already authenticated in this browser session
+  // Auto-unlock immediately if running locally on localhost/127.0.0.1
   useEffect(() => {
-    const savedPassword = sessionStorage.getItem('rc_auth_key');
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const localFallbackPass = 'RcFIGAvrckkea2qEb9uX';
+    const savedPassword = sessionStorage.getItem('rc_auth_key') || (isLocalhost ? localFallbackPass : null);
+
     if (savedPassword) {
       unlockDonations(savedPassword)
         .then(bundle => setUnlockedData(bundle))
