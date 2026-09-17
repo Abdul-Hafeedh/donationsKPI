@@ -183,7 +183,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           </button>
         )}
 
-        {/* Open GitHub Link */}
+        {/* Open GitHub Link (Icon only) */}
         <a
           href={liveUrl}
           target="_blank"
@@ -192,44 +192,42 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
-            backgroundColor: '#f8fafc',
+            justifyContent: 'center',
+            backgroundColor: '#ffffff',
             border: '1px solid #cbd5e1',
-            padding: '6px 10px',
+            width: '32px',
+            height: '32px',
             borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: 600,
             color: '#334155',
             textDecoration: 'none',
             cursor: 'pointer',
             transition: 'all 0.15s ease',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
           }}
         >
-          <ExternalLink size={13} />
-          <span>GitHub</span>
+          <ExternalLink size={15} />
         </a>
 
-        {/* Copy Password Button */}
+        {/* Copy Password Button (Icon only) */}
         <button
           onClick={handleCopyPassword}
-          title="Kopiér adgangskoden til udklipsholderen så du kan dele den med andre"
+          title={copiedPass ? "Kode kopieret!" : "Kopiér adgangskode"}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
-            backgroundColor: copiedPass ? '#ecfdf5' : '#f8fafc',
+            justifyContent: 'center',
+            backgroundColor: copiedPass ? '#ecfdf5' : '#ffffff',
             border: copiedPass ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
-            padding: '6px 12px',
+            width: '32px',
+            height: '32px',
             borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: 600,
             color: copiedPass ? '#059669' : '#334155',
             cursor: 'pointer',
             transition: 'all 0.15s ease',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
           }}
         >
-          {copiedPass ? <Check size={13} /> : <Key size={13} />}
-          <span>{copiedPass ? 'Kode kopieret!' : 'Kopiér kode'}</span>
+          {copiedPass ? <Check size={15} /> : <Key size={15} />}
         </button>
       </div>
     </header>
