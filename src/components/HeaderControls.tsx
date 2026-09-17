@@ -1,5 +1,5 @@
-import React from 'react';
-import { RefreshCw, Radio, CheckCircle, Sliders, Download, Lock } from 'lucide-react';
+import React, { useState } from 'react';
+import { RefreshCw, Radio, CheckCircle, Sliders, Download, ExternalLink, Key, Check } from 'lucide-react';
 
 interface HeaderControlsProps {
   dataSource: 'live' | 'benchmark' | 'hybrid';
@@ -14,7 +14,6 @@ interface HeaderControlsProps {
   periodSelector?: React.ReactNode;
   showBarStats?: boolean;
   onToggleBarStats?: () => void;
-  onLock?: () => void;
 }
 
 export const HeaderControls: React.FC<HeaderControlsProps> = ({
@@ -30,8 +29,23 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
   periodSelector,
   showBarStats = false,
   onToggleBarStats,
-  onLock,
 }) => {
+  const [copiedPass, setCopiedPass] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const liveUrl = 'https://abdul-hafeedh.github.io/donationsKPI/';
+  const passwordStr = 'RcFIGAvrckkea2qEb9uX';
+
+  const handleCopyPassword = () => {
+    navigator.clipboard.writeText(passwordStr);
+    setCopiedPass(true);
+    setTimeout(() => setCopiedPass(false), 2000);
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(liveUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
   return (
     <header
       style={{
@@ -169,29 +183,54 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           </button>
         )}
 
-        {onLock && (
-          <button
-            onClick={onLock}
-            title="Lås dashboard og ryd dekrypteret data fra browseren"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#475569',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Lock size={13} />
-            Lås
-          </button>
-        )}
+        {/* Open GitHub Link */}
+        <a
+          href={liveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Åbn offentlig GitHub Pages side"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            backgroundColor: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            padding: '6px 10px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: '#334155',
+            textDecoration: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <ExternalLink size={13} />
+          <span>GitHub</span>
+        </a>
+
+        {/* Copy Password Button */}
+        <button
+          onClick={handleCopyPassword}
+          title="Kopiér adgangskoden til udklipsholderen så du kan dele den med andre"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            backgroundColor: copiedPass ? '#ecfdf5' : '#f8fafc',
+            border: copiedPass ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: copiedPass ? '#059669' : '#334155',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          {copiedPass ? <Check size={13} /> : <Key size={13} />}
+          <span>{copiedPass ? 'Kode kopieret!' : 'Kopiér kode'}</span>
+        </button>
       </div>
     </header>
   );

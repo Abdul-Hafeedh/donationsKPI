@@ -415,7 +415,6 @@ export function App() {
             periodSelector={<PeriodSelector value={dateRange} onChange={handleDateRangeChange} />}
             showBarStats={showBarStats}
             onToggleBarStats={() => setShowBarStats(!showBarStats)}
-            onLock={handleLock}
           />
         </div>
       )}
