@@ -6,12 +6,14 @@ import { DenominationListCard } from './components/DenominationListCard';
 import { HeaderControls } from './components/HeaderControls';
 import { WeekDetailsModal } from './components/WeekDetailsModal';
 import { PeriodSelector, DateRange } from './components/PeriodSelector';
-import { liveVippsDonations, historical901600Donations, allDonations, aggregateDonationsByWeek } from './data/vippsDataLoader';
-import { WeekData } from './types';
+import { unlockDonations, aggregateDonationsByWeek, DecryptedDonationsBundle } from './data/vippsDataLoader';
+import { WeekData, DonationTransaction } from './types';
 import { Target, TrendingUp, Users, X, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import { PasswordPrompt } from './components/PasswordPrompt';
 
 export function App() {
+  const [unlockedData, setUnlockedData] = useState<DecryptedDonationsBundle | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [targetAmount, setTargetAmount] = useState<number>(250);
   const [selectedWeekNum, setSelectedWeekNum] = useState<number | null>(null);
@@ -28,6 +30,32 @@ export function App() {
     label: 'Vælg periode',
     presetKey: 'all',
   });
+
+  // Try auto-unlocking from session storage if already authenticated in this browser session
+  useEffect(() => {
+    const savedPassword = sessionStorage.getItem('rc_auth_key');
+    if (savedPassword) {
+      unlockDonations(savedPassword)
+        .then(bundle => setUnlockedData(bundle))
+        .catch(() => sessionStorage.removeItem('rc_auth_key'));
+    }
+  }, []);
+
+  const handleUnlock = async (pass: string): Promise<boolean> => {
+    try {
+      const bundle = await unlockDonations(pass);
+      setUnlockedData(bundle);
+      sessionStorage.setItem('rc_auth_key', pass);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const handleLock = () => {
+    sessionStorage.removeItem('rc_auth_key');
+    setUnlockedData(null);
+  };
 
   // Listen for Escape key to close any open modal
   useEffect(() => {
@@ -58,17 +86,21 @@ export function App() {
   };
 
   // Filter the master pool of donations by the selected date range
+  const allDonationsList = useMemo(() => {
+    return unlockedData?.allDonations || [];
+  }, [unlockedData]);
+
   const filteredDonations = useMemo(() => {
     if (!dateRange.startDate && !dateRange.endDate) {
-      return allDonations;
+      return allDonationsList;
     }
-    return allDonations.filter(d => {
+    return allDonationsList.filter(d => {
       const dt = d.dateTime.slice(0, 10);
       if (dateRange.startDate && dt < dateRange.startDate) return false;
       if (dateRange.endDate && dt > dateRange.endDate) return false;
       return true;
     });
-  }, [dateRange]);
+  }, [allDonationsList, dateRange]);
 
   // Compute weeks based on filtered donations
   const rawWeeks = useMemo(() => {
@@ -340,6 +372,10 @@ export function App() {
     }
   };
 
+  if (!unlockedData) {
+    return <PasswordPrompt onUnlock={handleUnlock} />;
+  }
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Top Menu Bar Toggle */}
@@ -371,12 +407,12 @@ export function App() {
             lastUpdated={lastUpdated}
             isRefreshing={isRefreshing}
             onRefresh={handleRefresh}
-            liveCount={liveVippsDonations.length}
             onExportPng={handleExportPng}
             isExporting={isExporting}
             periodSelector={<PeriodSelector value={dateRange} onChange={handleDateRangeChange} />}
             showBarStats={showBarStats}
             onToggleBarStats={() => setShowBarStats(!showBarStats)}
+            onLock={handleLock}
           />
         </div>
       )}

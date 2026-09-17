@@ -1,5 +1,6 @@
 import { DonationTransaction, WeekData } from '../types';
-import rawLiveDonations from '../../vipps-live-donations.json';
+import encryptedPayload from './encrypted-donations.json';
+import { decryptData, EncryptedPayload } from '../utils/crypto';
 
 // Helper to get ISO week number from Date
 export function getISOWeek(date: Date): { week: number; year: number } {
@@ -34,12 +35,6 @@ export function parseVippsDonations(items: any[]): DonationTransaction[] {
     })
     .filter((donation) => donation.amount >= 10);
 }
-
-export const liveVippsDonations: DonationTransaction[] = parseVippsDonations(rawLiveDonations);
-
-import rawHistoricalDonations from './historical-donations-901600.json';
-export const historical901600Donations: DonationTransaction[] = rawHistoricalDonations as DonationTransaction[];
-export const allDonations: DonationTransaction[] = [...historical901600Donations, ...liveVippsDonations];
 
 // Helper to get localized Danish date range string for an ISO week
 export function getWeekDateRange(year: number, week: number): string {
@@ -86,4 +81,26 @@ export function aggregateDonationsByWeek(donations: DonationTransaction[]): Week
   }));
 
   return results.sort((a, b) => a.year !== b.year ? a.year - b.year : a.week - b.week);
+}
+
+export interface DecryptedDonationsBundle {
+  liveDonations: DonationTransaction[];
+  historicalDonations: DonationTransaction[];
+  allDonations: DonationTransaction[];
+}
+
+// Unlock and decrypt data bundle using provided password
+export async function unlockDonations(password: string): Promise<DecryptedDonationsBundle> {
+  const decryptedJsonStr = await decryptData(encryptedPayload as EncryptedPayload, password);
+  const rawData = JSON.parse(decryptedJsonStr);
+
+  const live = parseVippsDonations(rawData.live || []);
+  const hist = (rawData.historical || []) as DonationTransaction[];
+  const all = [...hist, ...live];
+
+  return {
+    liveDonations: live,
+    historicalDonations: hist,
+    allDonations: all,
+  };
 }

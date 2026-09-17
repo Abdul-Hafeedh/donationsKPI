@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Radio, CheckCircle, Sliders, Download } from 'lucide-react';
+import { RefreshCw, Radio, CheckCircle, Sliders, Download, Lock } from 'lucide-react';
 
 interface HeaderControlsProps {
   dataSource: 'live' | 'benchmark' | 'hybrid';
@@ -14,6 +14,7 @@ interface HeaderControlsProps {
   periodSelector?: React.ReactNode;
   showBarStats?: boolean;
   onToggleBarStats?: () => void;
+  onLock?: () => void;
 }
 
 export const HeaderControls: React.FC<HeaderControlsProps> = ({
@@ -29,6 +30,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
   periodSelector,
   showBarStats = false,
   onToggleBarStats,
+  onLock,
 }) => {
   return (
     <header
@@ -164,6 +166,30 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           >
             <Download size={14} />
             {isExporting ? 'Eksporterer...' : 'Eksportér PNG'}
+          </button>
+        )}
+
+        {onLock && (
+          <button
+            onClick={onLock}
+            title="Lås dashboard og ryd dekrypteret data fra browseren"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#f1f5f9',
+              border: '1px solid #cbd5e1',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#475569',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Lock size={13} />
+            Lås
           </button>
         )}
       </div>

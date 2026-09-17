@@ -7,6 +7,7 @@
     "dev": "vite --port 5176",
     "build": "vite build",
     "preview": "vite preview --port 5176",
+    "encrypt": "node scripts/encryptData.js",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
