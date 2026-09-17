@@ -1,7 +1,9 @@
 node_modules
 dist
+.vite
 .DS_Store
 *.local
 vipps-live-donations.json
 src/data/historical-donations-901600.json
+
 
