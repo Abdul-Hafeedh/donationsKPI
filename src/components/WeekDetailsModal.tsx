@@ -5,9 +5,11 @@ import { Calendar, User, DollarSign, X } from 'lucide-react';
 interface WeekDetailsModalProps {
   week: WeekData;
   onClose: () => void;
+  onAddDonation?: () => void;
 }
 
 export function formatDonorName(fullName: string): string {
+
   if (!fullName || fullName.trim() === '' || fullName.toLowerCase() === 'anonym') {
     return 'Anonym';
   }
@@ -20,7 +22,8 @@ export function formatDonorName(fullName: string): string {
   return `${firstName} ${initial}.`;
 }
 
-export const WeekDetailsModal: React.FC<WeekDetailsModalProps> = ({ week, onClose }) => {
+export const WeekDetailsModal: React.FC<WeekDetailsModalProps> = ({ week, onClose, onAddDonation }) => {
+
   return (
     <div
       style={{
@@ -131,9 +134,35 @@ export const WeekDetailsModal: React.FC<WeekDetailsModalProps> = ({ week, onClos
 
         {/* Donations list if available */}
         <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-          <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '10px' }}>
-            Registrerede donationer i denne uge:
-          </h4>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', margin: 0 }}>
+              Registrerede donationer i denne uge:
+            </h4>
+            {onAddDonation && (
+              <button
+                onClick={onAddDonation}
+                title="Tilføj donation til denne uge"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#166534',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span>➕</span>
+                <span>Tilføj til uge {week.week}</span>
+              </button>
+            )}
+          </div>
+
 
           {week.donations && week.donations.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

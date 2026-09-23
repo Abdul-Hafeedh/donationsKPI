@@ -9,6 +9,7 @@ interface HeaderControlsProps {
   lastUpdated: string;
   isRefreshing: boolean;
   onRefresh: () => void;
+  onOpenManualEntry?: () => void;
   onExportPng?: () => void;
   isExporting?: boolean;
   periodSelector?: React.ReactNode;
@@ -24,6 +25,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
   lastUpdated,
   isRefreshing,
   onRefresh,
+  onOpenManualEntry,
   onExportPng,
   isExporting,
   periodSelector,
@@ -155,6 +157,31 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
           {lastUpdated}
         </button>
+
+        {onOpenManualEntry && (
+          <button
+            onClick={onOpenManualEntry}
+            title="Indtast en donation manuelt (f.eks. for nummer 901600)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #86efac',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 700,
+              color: '#166534',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>➕</span>
+            <span>Tilføj donation</span>
+          </button>
+        )}
+
 
         {onExportPng && (
           <button

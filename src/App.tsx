@@ -6,15 +6,21 @@ import { DenominationListCard } from './components/DenominationListCard';
 import { HeaderControls } from './components/HeaderControls';
 import { WeekDetailsModal } from './components/WeekDetailsModal';
 import { PeriodSelector, DateRange } from './components/PeriodSelector';
-import { unlockDonations, aggregateDonationsByWeek, DecryptedDonationsBundle } from './data/vippsDataLoader';
+import { unlockDonations, aggregateDonationsByWeek, parseVippsDonations, DecryptedDonationsBundle } from './data/vippsDataLoader';
 import { WeekData, DonationTransaction } from './types';
 import { Target, TrendingUp, Users, X, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { PasswordPrompt } from './components/PasswordPrompt';
+import { ManualEntryModal } from './components/ManualEntryModal';
 
 export function App() {
   const [unlockedData, setUnlockedData] = useState<DecryptedDonationsBundle | null>(null);
+  const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
+  const [manualEntryTargetWeek, setManualEntryTargetWeek] = useState<{ year: number; week: number } | null>(null);
+  const [isSubmittingManual, setIsSubmittingManual] = useState<boolean>(false);
   const [selectedYear, setSelectedYear] = useState<number>(2026);
+
+
   const [targetAmount, setTargetAmount] = useState<number>(250);
   const [selectedWeekNum, setSelectedWeekNum] = useState<number | null>(null);
   const [filteredAmount, setFilteredAmount] = useState<number | null>(null);
@@ -212,14 +218,98 @@ export function App() {
     }
   };
 
-  // Manual refresh simulation / live check
-  const handleRefresh = () => {
+  // Real MobilePay/Vipps sync & GitHub deploy handler
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      setLastUpdated(new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
-    }, 600);
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isLocalhost) {
+      try {
+        const response = await fetch('/api/sync-donations', { method: 'POST' });
+        if (!response.ok) {
+          throw new Error(`Sync fejlede med status ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.rawLive) {
+          const freshLive = parseVippsDonations(data.rawLive);
+          const hist = (data.historical && data.historical.length > 0)
+            ? data.historical
+            : (unlockedData?.historicalDonations || []);
+          setUnlockedData({
+            liveDonations: freshLive,
+            historicalDonations: hist,
+            allDonations: [...hist, ...freshLive],
+          });
+        }
+
+        setLastUpdated(data.timestamp || new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
+      } catch (err) {
+        console.error('Kunne ikke synkronisere med Vipps:', err);
+        setLastUpdated(new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
+      } finally {
+        setIsRefreshing(false);
+      }
+    } else {
+      // På ekstern GitHub URL: genindlæs krypteret databundt hvis browser-cache har nyt
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setLastUpdated(new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
+      }, 600);
+    }
   };
+
+  // Submit manual donation (saves locally to 901600 dataset, encrypts and deploys to GitHub)
+  const handleAddManualDonation = async (newDon: DonationTransaction) => {
+    setIsSubmittingManual(true);
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isLocalhost) {
+      try {
+        const response = await fetch('/api/manual-donation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newDon),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Fejl ved indtastning: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const hist = data.historical || [newDon, ...(unlockedData?.historicalDonations || [])];
+        const live = unlockedData?.liveDonations || [];
+
+        setUnlockedData({
+          liveDonations: live,
+          historicalDonations: hist,
+          allDonations: [...hist, ...live],
+        });
+
+        setLastUpdated(data.timestamp || new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
+        setIsManualModalOpen(false);
+      } catch (err) {
+        console.error('Fejl ved oprettelse af manuel donation:', err);
+        alert('Kunne ikke gemme donationen. Tjek konsollen for detaljer.');
+      } finally {
+        setIsSubmittingManual(false);
+      }
+    } else {
+      // Hvis tilgået på ekstern URL uden backend-server
+      setUnlockedData(prev => {
+        const hist = [newDon, ...(prev?.historicalDonations || [])];
+        const live = prev?.liveDonations || [];
+        return {
+          liveDonations: live,
+          historicalDonations: hist,
+          allDonations: [...hist, ...live],
+        };
+      });
+      setIsManualModalOpen(false);
+      setIsSubmittingManual(false);
+    }
+  };
+
+
 
   const handleSelectWeek = (weekNum: number | null) => {
     setSelectedWeekNum(weekNum);
@@ -410,6 +500,7 @@ export function App() {
             lastUpdated={lastUpdated}
             isRefreshing={isRefreshing}
             onRefresh={handleRefresh}
+            onOpenManualEntry={() => setIsManualModalOpen(true)}
             onExportPng={handleExportPng}
             isExporting={isExporting}
             periodSelector={<PeriodSelector value={dateRange} onChange={handleDateRangeChange} />}
@@ -418,6 +509,7 @@ export function App() {
           />
         </div>
       )}
+
 
       {/* Main Dashboard Layout Container matching the reference design dimensions */}
       <div ref={dashboardRef} className="dashboard-grid-container">
@@ -508,12 +600,21 @@ export function App() {
       </div>
 
       {/* Week Details Modal */}
-      {inspectingWeek && (
-        <WeekDetailsModal
-          week={inspectingWeek}
-          onClose={() => setInspectingWeek(null)}
-        />
-      )}
+      {inspectingWeek && (() => {
+        const activeWeekData = weeks.find(w => w.week === inspectingWeek.week && (selectedYear === 0 || w.year === inspectingWeek.year)) || inspectingWeek;
+        return (
+          <WeekDetailsModal
+            week={activeWeekData}
+            onClose={() => setInspectingWeek(null)}
+            onAddDonation={() => {
+              setManualEntryTargetWeek({ year: activeWeekData.year, week: activeWeekData.week });
+              setIsManualModalOpen(true);
+            }}
+          />
+        );
+      })()}
+
+
 
       {/* Interactive KPI Detail Modals */}
       {activeKpiModal === 'mal' && (
@@ -818,7 +919,24 @@ export function App() {
         </div>
       )}
 
+
+      {/* Manual Entry Modal */}
+      <ManualEntryModal
+        isOpen={isManualModalOpen}
+        onClose={() => {
+          setIsManualModalOpen(false);
+          setManualEntryTargetWeek(null);
+        }}
+        onSubmit={handleAddManualDonation}
+        isSubmitting={isSubmittingManual}
+        defaultYear={manualEntryTargetWeek?.year}
+        defaultWeek={manualEntryTargetWeek?.week}
+      />
+
+
+
       {/* Responsive media style overrides */}
+
       <style>{`
         @media (max-width: 1024px) {
           .dashboard-left-col {
