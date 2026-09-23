@@ -118,11 +118,21 @@ export async function syncAndDeploy() {
   const livePath = path.join(rootDir, 'vipps-live-donations.json');
   fs.writeFileSync(livePath, JSON.stringify(liveItems, null, 2), 'utf8');
 
-  // Læs historiske data hvis tilgængelige
+  // Læs historiske data hvis tilgængelige (eller gendan fra backup hvis filen mangler)
   const histPath = path.join(rootDir, 'src/data/historical-donations-901600.json');
-  const histData = fs.existsSync(histPath) ? JSON.parse(fs.readFileSync(histPath, 'utf8')) : [];
+  const backupDir = path.join(rootDir, 'src/data/backups');
+  let histData = [];
+
+  if (fs.existsSync(histPath)) {
+    histData = JSON.parse(fs.readFileSync(histPath, 'utf8'));
+  } else if (fs.existsSync(path.join(backupDir, 'historical-donations-latest.backup.json'))) {
+    console.log('🛡️ [Safety] Gendanner historiske data fra automatisk backup...');
+    histData = JSON.parse(fs.readFileSync(path.join(backupDir, 'historical-donations-latest.backup.json'), 'utf8'));
+    fs.writeFileSync(histPath, JSON.stringify(histData, null, 2), 'utf8');
+  }
 
   // 4. Krypter og gem til encrypted-donations.json
+
   const payloadToEncrypt = JSON.stringify({
     live: liveItems,
     historical: histData,
@@ -159,13 +169,29 @@ export async function addManualDonation(donation) {
   console.log('➕ [Manual] Tilføjer manuel donation:', donation);
 
   const histPath = path.join(rootDir, 'src/data/historical-donations-901600.json');
+  const backupDir = path.join(rootDir, 'src/data/backups');
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+  }
+
   const histData = fs.existsSync(histPath) ? JSON.parse(fs.readFileSync(histPath, 'utf8')) : [];
 
-  // Tilføj den nye donation
-  histData.unshift(donation);
+  // Sikkerhedstjek: Undgå at duplikere samme id
+  if (!histData.some(d => d.id === donation.id)) {
+    histData.unshift(donation);
+  }
 
-  // Gem lokalt
+  // 1. Skriv til den primære historiske fil
   fs.writeFileSync(histPath, JSON.stringify(histData, null, 2), 'utf8');
+
+  // 2. Skriv en automatisk sikkerhedskopi med datostempel
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dateBackupPath = path.join(backupDir, `historical-${todayStr}.json`);
+  fs.writeFileSync(dateBackupPath, JSON.stringify(histData, null, 2), 'utf8');
+
+  // 3. Fast rullende backup
+  const rollingBackupPath = path.join(backupDir, `historical-donations-latest.backup.json`);
+  fs.writeFileSync(rollingBackupPath, JSON.stringify(histData, null, 2), 'utf8');
 
   // Læs live-donations
   const livePath = path.join(rootDir, 'vipps-live-donations.json');
@@ -173,6 +199,7 @@ export async function addManualDonation(donation) {
 
   // Krypter og gem til encrypted-donations.json
   const payloadToEncrypt = JSON.stringify({
+
     live: liveItems,
     historical: histData,
     encryptedAt: new Date().toISOString(),
