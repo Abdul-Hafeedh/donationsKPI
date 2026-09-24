@@ -138,29 +138,6 @@ export const WeekDetailsModal: React.FC<WeekDetailsModalProps> = ({ week, onClos
             <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', margin: 0 }}>
               Registrerede donationer i denne uge:
             </h4>
-            {onAddDonation && (
-              <button
-                onClick={onAddDonation}
-                title="Tilføj donation til denne uge"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  backgroundColor: '#f0fdf4',
-                  border: '1px solid #86efac',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#166534',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <span>➕</span>
-                <span>Tilføj til uge {week.week}</span>
-              </button>
-            )}
           </div>
 
 

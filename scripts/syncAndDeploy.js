@@ -231,13 +231,160 @@ export async function addManualDonation(donation) {
   };
 }
 
+export async function importCsvTransactions(csvContent) {
+  console.log('📄 [CSV Import] Behandler MobilePay transaktionsrapport...');
+
+  const histPath = path.join(rootDir, 'src/data/historical-donations-901600.json');
+  const backupDir = path.join(rootDir, 'src/data/backups');
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+  }
+
+  const histData = fs.existsSync(histPath) ? JSON.parse(fs.readFileSync(histPath, 'utf8')) : [];
+  const existingIds = new Set(histData.map(d => String(d.id)));
+
+  const lines = csvContent.trim().split(/\r?\n/);
+  if (lines.length < 2) {
+    throw new Error('CSV-filen er tom eller mangler rækker.');
+  }
+
+  const header = lines[0].split(';');
+  const typeIdx = header.indexOf('Type');
+  const idIdx = header.indexOf('Transaktions ID');
+  const amountIdx = header.indexOf('Beløb');
+  const dateIdx = header.indexOf('Tidsstempel');
+  const nameIdx = header.indexOf('Kundenavn');
+  const msgIdx = header.indexOf('Besked');
+  const msnIdx = header.indexOf('MyShop Nummer');
+
+  const addedItems = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].trim();
+    if (!row) continue;
+    const parts = row.split(';');
+
+    const type = (typeIdx !== -1 ? parts[typeIdx] : parts[5])?.trim();
+    // Vi filtrerer kun faktiske betalinger / donationer, ikke 'Gebyr'
+    if (type !== 'Betaling') {
+      continue;
+    }
+
+    const id = (idIdx !== -1 ? parts[idIdx] : parts[14])?.trim();
+    if (!id || existingIds.has(id)) {
+      continue;
+    }
+
+    const rawAmt = (amountIdx !== -1 ? parts[amountIdx] : parts[6])?.trim().replace(/\./g, '').replace(',', '.');
+    const amount = parseFloat(rawAmt);
+    if (isNaN(amount)) continue;
+
+    const dateTime = (dateIdx !== -1 ? parts[dateIdx] : parts[10])?.trim();
+    const name = (nameIdx !== -1 ? parts[nameIdx] : parts[15])?.trim() || '';
+    const message = (msgIdx !== -1 ? parts[msgIdx] : parts[11])?.trim() || '';
+    const rawMsn = (msnIdx !== -1 ? parts[msnIdx] : parts[18])?.trim() || '';
+    const mobilePayNumber = rawMsn.replace(/^DK:/, '') || '901600';
+
+    const newRecord = {
+      id,
+      dateTime,
+      name,
+      amount,
+      message,
+      status: 'COMPLETED',
+      isLive: false,
+      mobilePayNumber,
+    };
+
+    addedItems.push(newRecord);
+    existingIds.add(id);
+  }
+
+  console.log(`✅ [CSV Import] Fandt ${addedItems.length} nye donationer i CSV.`);
+
+  if (addedItems.length > 0) {
+    // Sæt nye donationer ind forrest og sorter faldende efter tidspunkt
+    const updatedHist = [...addedItems, ...histData].sort(
+      (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+    );
+
+    // 1. Skriv til den primære historiske fil
+    fs.writeFileSync(histPath, JSON.stringify(updatedHist, null, 2), 'utf8');
+
+    // 2. Skriv sikkerhedskopi med datostempel
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dateBackupPath = path.join(backupDir, `historical-${todayStr}.json`);
+    fs.writeFileSync(dateBackupPath, JSON.stringify(updatedHist, null, 2), 'utf8');
+
+    // 3. Fast rullende backup
+    const rollingBackupPath = path.join(backupDir, 'historical-donations-latest.backup.json');
+    fs.writeFileSync(rollingBackupPath, JSON.stringify(updatedHist, null, 2), 'utf8');
+
+    // Læs live-donations
+    const livePath = path.join(rootDir, 'vipps-live-donations.json');
+    const liveItems = fs.existsSync(livePath) ? JSON.parse(fs.readFileSync(livePath, 'utf8')) : [];
+
+    // Krypter og gem til encrypted-donations.json
+    const payloadToEncrypt = JSON.stringify({
+      live: liveItems,
+      historical: updatedHist,
+      encryptedAt: new Date().toISOString(),
+    });
+
+    const encrypted = await encrypt(payloadToEncrypt, DASHBOARD_PASS);
+    const encPath = path.join(rootDir, 'src/data/encrypted-donations.json');
+    fs.writeFileSync(encPath, JSON.stringify(encrypted, null, 2), 'utf8');
+    console.log('🔐 [CSV Import] Krypteret datapakke opdateret med CSV-donationer.');
+
+    // Byg og deploy til GitHub
+    console.log('🚀 [CSV Import] Bygger og sender til GitHub...');
+    let deployOutput = '';
+    try {
+      deployOutput = execSync('bash deploy.sh', { cwd: rootDir, encoding: 'utf8' });
+      console.log('✨ [CSV Import] Deploy til GitHub fuldført!');
+    } catch (deployErr) {
+      console.error('⚠️ [CSV Import] Advarsel: GitHub deploy fejlede, men lokale data er opdateret:', deployErr);
+      deployOutput = String(deployErr);
+    }
+
+    return {
+      success: true,
+      addedCount: addedItems.length,
+      addedItems,
+      totalCount: updatedHist.length,
+      deployOutput,
+    };
+  } else {
+    return {
+      success: true,
+      addedCount: 0,
+      addedItems: [],
+      totalCount: histData.length,
+      message: 'Alle transaktioner fra CSV eksisterede allerede i databasen.',
+    };
+  }
+}
+
 // Hvis kørt direkte fra kommandolinjen
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  syncAndDeploy()
-    .then(res => console.log('Udført:', res))
-    .catch(err => {
-      console.error('Fejl:', err);
-      process.exit(1);
-    });
+  const argFile = process.argv[2];
+  if (argFile && fs.existsSync(argFile)) {
+    console.log(`Læser CSV fil fra parameter: ${argFile}`);
+    const content = fs.readFileSync(argFile, 'utf8');
+    importCsvTransactions(content)
+      .then(res => console.log('CSV Import færdig:', res))
+      .catch(err => {
+        console.error('CSV Import fejl:', err);
+        process.exit(1);
+      });
+  } else {
+    syncAndDeploy()
+      .then(res => console.log('Udført:', res))
+      .catch(err => {
+        console.error('Fejl:', err);
+        process.exit(1);
+      });
+  }
 }
+
 

@@ -9,6 +9,8 @@ interface HeaderControlsProps {
   lastUpdated: string;
   isRefreshing: boolean;
   onRefresh: () => void;
+  onImportCsv?: (file: File) => void;
+  isImportingCsv?: boolean;
   onOpenManualEntry?: () => void;
   onExportPng?: () => void;
   isExporting?: boolean;
@@ -25,6 +27,8 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
   lastUpdated,
   isRefreshing,
   onRefresh,
+  onImportCsv,
+  isImportingCsv = false,
   onOpenManualEntry,
   onExportPng,
   isExporting,
@@ -34,6 +38,7 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
 }) => {
   const [copiedPass, setCopiedPass] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const liveUrl = 'https://abdul-hafeedh.github.io/donationsKPI/';
   const passwordStr = 'RcFIGAvrckkea2qEb9uX';
 
@@ -47,6 +52,14 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
     navigator.clipboard.writeText(liveUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportCsv) {
+      onImportCsv(file);
+      e.target.value = '';
+    }
   };
   return (
     <header
@@ -158,28 +171,39 @@ export const HeaderControls: React.FC<HeaderControlsProps> = ({
           {lastUpdated}
         </button>
 
-        {onOpenManualEntry && (
-          <button
-            onClick={onOpenManualEntry}
-            title="Indtast en donation manuelt (f.eks. for nummer 901600)"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #86efac',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#166534',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <span>➕</span>
-            <span>Tilføj donation</span>
-          </button>
+        {onImportCsv && (
+          <>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImportingCsv}
+              title="Upload MobilePay CSV transaktionsrapport og opdater databasen automatisk"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #86efac',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#166534',
+                cursor: isImportingCsv ? 'wait' : 'pointer',
+                opacity: isImportingCsv ? 0.7 : 1,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span>📄</span>
+              <span>{isImportingCsv ? 'Importerer CSV...' : 'Indlæs CSV rapport'}</span>
+            </button>
+          </>
         )}
 
 

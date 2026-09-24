@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { syncAndDeploy, addManualDonation } from './scripts/syncAndDeploy.js';
+import { syncAndDeploy, addManualDonation, importCsvTransactions } from './scripts/syncAndDeploy.js';
 
 export default defineConfig({
   base: '/donationsKPI/',
@@ -27,6 +27,30 @@ export default defineConfig({
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ error: err.message || 'Ukendt fejl' }));
           }
+        });
+
+        server.middlewares.use('/api/import-csv', async (req, res) => {
+          if (req.method !== 'POST') {
+            res.statusCode = 405;
+            res.end(JSON.stringify({ error: 'Method not allowed' }));
+            return;
+          }
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              console.log('⚡ [Vite Server] Modtog CSV fil til import & deploy til GitHub...');
+              const result = await importCsvTransactions(body);
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(result));
+            } catch (err: any) {
+              console.error('❌ [Vite Server] Fejl ved CSV import:', err);
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message || 'Ukendt fejl' }));
+            }
+          });
         });
 
         server.middlewares.use('/api/manual-donation', async (req, res) => {

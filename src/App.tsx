@@ -11,13 +11,10 @@ import { WeekData, DonationTransaction } from './types';
 import { Target, TrendingUp, Users, X, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { PasswordPrompt } from './components/PasswordPrompt';
-import { ManualEntryModal } from './components/ManualEntryModal';
 
 export function App() {
   const [unlockedData, setUnlockedData] = useState<DecryptedDonationsBundle | null>(null);
-  const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
-  const [manualEntryTargetWeek, setManualEntryTargetWeek] = useState<{ year: number; week: number } | null>(null);
-  const [isSubmittingManual, setIsSubmittingManual] = useState<boolean>(false);
+  const [isImportingCsv, setIsImportingCsv] = useState<boolean>(false);
   const [selectedYear, setSelectedYear] = useState<number>(2026);
 
 
@@ -258,54 +255,50 @@ export function App() {
     }
   };
 
-  // Submit manual donation (saves locally to 901600 dataset, encrypts and deploys to GitHub)
-  const handleAddManualDonation = async (newDon: DonationTransaction) => {
-    setIsSubmittingManual(true);
+  // CSV Import handler (imports from MobilePay transactions report, encrypts & deploys to GitHub)
+  const handleImportCsv = async (file: File) => {
+    setIsImportingCsv(true);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-    if (isLocalhost) {
-      try {
-        const response = await fetch('/api/manual-donation', {
+    try {
+      const csvText = await file.text();
+
+      if (isLocalhost) {
+        const response = await fetch('/api/import-csv', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newDon),
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          body: csvText,
         });
 
         if (!response.ok) {
-          throw new Error(`Fejl ved indtastning: ${response.status}`);
+          throw new Error(`Fejl ved import: ${response.status}`);
         }
 
         const data = await response.json();
-        const hist = data.historical || [newDon, ...(unlockedData?.historicalDonations || [])];
-        const live = unlockedData?.liveDonations || [];
+        if (data.addedItems && data.addedItems.length > 0) {
+          const freshHist = [...data.addedItems, ...(unlockedData?.historicalDonations || [])].sort(
+            (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+          );
+          const live = unlockedData?.liveDonations || [];
+          setUnlockedData({
+            liveDonations: live,
+            historicalDonations: freshHist,
+            allDonations: [...freshHist, ...live],
+          });
+          alert(`✅ Succes! ${data.addedCount} nye donationer blev importeret og uploadet.`);
+        } else {
+          alert('ℹ️ Alle donationer i denne CSV-fil findes allerede i databasen.');
+        }
 
-        setUnlockedData({
-          liveDonations: live,
-          historicalDonations: hist,
-          allDonations: [...hist, ...live],
-        });
-
-        setLastUpdated(data.timestamp || new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
-        setIsManualModalOpen(false);
-      } catch (err) {
-        console.error('Fejl ved oprettelse af manuel donation:', err);
-        alert('Kunne ikke gemme donationen. Tjek konsollen for detaljer.');
-      } finally {
-        setIsSubmittingManual(false);
+        setLastUpdated(new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }));
+      } else {
+        alert('CSV-import direkte til server/GitHub er kun tilgængelig når dev-serveren kører lokalt.');
       }
-    } else {
-      // Hvis tilgået på ekstern URL uden backend-server
-      setUnlockedData(prev => {
-        const hist = [newDon, ...(prev?.historicalDonations || [])];
-        const live = prev?.liveDonations || [];
-        return {
-          liveDonations: live,
-          historicalDonations: hist,
-          allDonations: [...hist, ...live],
-        };
-      });
-      setIsManualModalOpen(false);
-      setIsSubmittingManual(false);
+    } catch (err: any) {
+      console.error('Fejl ved import af CSV:', err);
+      alert('Kunne ikke importere CSV: ' + (err.message || String(err)));
+    } finally {
+      setIsImportingCsv(false);
     }
   };
 
@@ -500,7 +493,8 @@ export function App() {
             lastUpdated={lastUpdated}
             isRefreshing={isRefreshing}
             onRefresh={handleRefresh}
-            onOpenManualEntry={() => setIsManualModalOpen(true)}
+            onImportCsv={handleImportCsv}
+            isImportingCsv={isImportingCsv}
             onExportPng={handleExportPng}
             isExporting={isExporting}
             periodSelector={<PeriodSelector value={dateRange} onChange={handleDateRangeChange} />}
@@ -606,10 +600,6 @@ export function App() {
           <WeekDetailsModal
             week={activeWeekData}
             onClose={() => setInspectingWeek(null)}
-            onAddDonation={() => {
-              setManualEntryTargetWeek({ year: activeWeekData.year, week: activeWeekData.week });
-              setIsManualModalOpen(true);
-            }}
           />
         );
       })()}
@@ -918,21 +908,6 @@ export function App() {
           </div>
         </div>
       )}
-
-
-      {/* Manual Entry Modal */}
-      <ManualEntryModal
-        isOpen={isManualModalOpen}
-        onClose={() => {
-          setIsManualModalOpen(false);
-          setManualEntryTargetWeek(null);
-        }}
-        onSubmit={handleAddManualDonation}
-        isSubmitting={isSubmittingManual}
-        defaultYear={manualEntryTargetWeek?.year}
-        defaultWeek={manualEntryTargetWeek?.week}
-      />
-
 
 
       {/* Responsive media style overrides */}
